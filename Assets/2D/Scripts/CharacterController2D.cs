@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -27,6 +28,7 @@ public class CharacterController2D : MonoBehaviour
 	[Header("Components")]
 	[SerializeField] Animator animator;             // Reference to character's animator
 	[SerializeField] SpriteRenderer spriteRenderer; // Reference to character's sprite renderer
+	[SerializeField] Health health;					// Reference to character's health
 
 	Rigidbody2D rb;                                // Reference to attached Rigidbody2D component
 
@@ -45,13 +47,24 @@ public class CharacterController2D : MonoBehaviour
 
 	// Movement input
 	Vector2 direction;                              // Current input direction (typically from -1 to 1)
+	float speedMultiplier = 1f;							//For things like sprinting
 
+	//Health related
+	float currentHealth;                            //Current Character Health
+	float invincibilityFrames = 1;
+	bool isHit = false;
+	bool isDead = false;
 	/// <summary>
 	/// Sets the movement direction based on input.
 	/// Called by input system when movement input changes.
 	/// </summary>
 	/// <param name="v">Vector2 containing horizontal and vertical input values</param>
-	public void OnMove(Vector2 v) => direction = v;
+	//public void OnMove(Vector2 v) => direction = v;
+	public void OnMove(Vector2 v)
+	{
+        if(isDead) return;
+        direction = v;
+	}
 
 	/// <summary>
 	/// Initialize references. Called before Start.
@@ -59,16 +72,20 @@ public class CharacterController2D : MonoBehaviour
 	void Awake()
 	{
 		rb = GetComponent<Rigidbody2D>();
+		currentHealth = health.getHealth();
 	}
 
 	/// <summary>
 	/// Handle non-physics updates. Called once per frame.
 	/// </summary>
-	void Update()
+	public void Update()
 	{
-		UpdateGroundCollision();
+        if(isDead) return;
+        UpdateGroundCollision();
 		UpdateFacing();
 		UpdateAnimator();
+		UpdateHealth();
+
 	}
 
 	/// <summary>
@@ -76,6 +93,7 @@ public class CharacterController2D : MonoBehaviour
 	/// </summary>
 	void FixedUpdate()
 	{
+		if(isDead) return;
 		// Calculate target speed based on input direction
 		float targetSpeed = direction.x * speed;
 
@@ -96,7 +114,7 @@ public class CharacterController2D : MonoBehaviour
 		}
 
 		// Apply horizontal velocity
-		rb.linearVelocityX = currentSpeed;
+		rb.linearVelocityX = currentSpeed * speedMultiplier;
 
 		// Apply variable jump height physics
 		if (rb.linearVelocityY < 0)
@@ -110,6 +128,13 @@ public class CharacterController2D : MonoBehaviour
 			// Apply extra gravity to cut the jump short (creates variable jump height)
 			rb.linearVelocityY += Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.fixedDeltaTime;
 		}
+
+		if(isHit)
+		{
+            Vector2 knockback = new Vector2(facing * -100, 10);
+            rb.AddForce(knockback, ForceMode2D.Impulse);
+			isHit = false;
+        }
 	}
 
 	/// <summary>
@@ -165,6 +190,33 @@ public class CharacterController2D : MonoBehaviour
 		animator.SetBool("InAir", !isGrounded);
 		animator.SetFloat("Speed", Mathf.Abs(direction.x));
 		animator.SetFloat("VelocityY", rb.linearVelocityY);
+    }
+
+    /// <summary>
+    /// Update current health and triggers onHit or onDeath if applicalbe
+    /// </summary>
+    void UpdateHealth()
+	{
+		if(currentHealth > health.getHealth())
+		{
+			if(health.getHealth() > 0)
+			{
+				currentHealth = health.getHealth();
+				OnHit();
+			}
+			else
+			{
+				currentHealth = 0;
+				OnDeath();
+			}
+		}
+
+        invincibilityFrames -= Time.deltaTime;
+
+        if (invincibilityFrames < 0)
+		{
+            health.isInvincible = false;
+        }
 	}
 
 	/// <summary>
@@ -225,6 +277,7 @@ public class CharacterController2D : MonoBehaviour
 	public void OnDeath()
 	{
 		animator?.SetTrigger("Death");
+		isDead = true;
 	}
 
 	/// <summary>
@@ -232,23 +285,41 @@ public class CharacterController2D : MonoBehaviour
 	/// </summary>
 	public void OnHit()
 	{
+		health.isInvincible = true;
 		animator?.SetTrigger("Hit");
-	}
+		invincibilityFrames = 1;
+		isHit = true;
+		
+    }
 
-	/// <summary>
-	/// Flip the character's facing direction by updating the sprite.
-	/// </summary>
-	private void FlipDirection()
+	public void OnSprintOn()
+	{
+        speedMultiplier = 2;
+        animator?.SetBool("Sprinting", true);
+    }
+
+    public void OnSprintOff()
+    {
+        speedMultiplier = 1;
+        animator?.SetBool("Sprinting", false);
+    }
+
+    /// <summary>
+    /// Flip the character's facing direction by updating the sprite.
+    /// </summary>
+    private void FlipDirection()
 	{
 		facing *= -1;  // Toggle between 1 and -1
 		if (spriteRenderer != null)
 			spriteRenderer.flipX = (facing == -1);  // Flip sprite when facing left
 	}
 
-	/// <summary>
-	/// Visualize ground detection in the editor. Only visible in Scene view when selected.
-	/// </summary>
-	private void OnDrawGizmosSelected()
+
+
+    /// <summary>
+    /// Visualize ground detection in the editor. Only visible in Scene view when selected.
+    /// </summary>
+    private void OnDrawGizmosSelected()
 	{
 		// Draw rays showing ground contact points and normals
 		if (groundHits > 0)

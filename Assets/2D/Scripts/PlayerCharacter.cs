@@ -3,7 +3,7 @@ using UnityEngine;
 public class PlayerCharacter : MonoBehaviour
 {
     [SerializeField] AnimationEventRouter animationEventRouter;
-    [SerializeField] GameObject meleeWeapon;
+    [SerializeField] GameObject fireDamage;
 
     private void Awake()
     {
@@ -12,8 +12,8 @@ public class PlayerCharacter : MonoBehaviour
 
     void OnFireAttack(AnimationEvent animationEvent)
     {
-        meleeWeapon.SetActive((animationEvent.intParameter == 1));
+        fireDamage.SetActive((animationEvent.intParameter == 1));
     }
 }
 
-}
+

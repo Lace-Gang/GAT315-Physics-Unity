@@ -11,6 +11,7 @@ public class Health : MonoBehaviour
     [SerializeField] private float destroyDelay = 0;          // Delay before destroying the game object (useful for death animations)
 
     private bool isDead = false;                              // Flag to track death state
+    public bool isInvincible = false;                         //Allown Invincibility Frames
 
     /// <summary>
     /// Initialize health to maxHealth when the component is created.
@@ -21,11 +22,21 @@ public class Health : MonoBehaviour
     }
 
     /// <summary>
+    /// Allows objects with the health component to see their health
+    /// </summary>
+    /// <returns>float health</returns>
+    public float getHealth()
+    {
+        return health;
+    }
+
+    /// <summary>
     /// Applies damage to this entity.
     /// </summary>
     /// <param name="damage">Amount of damage to apply</param>
     public void ApplyDamage(float damage)
     {
+        if (isInvincible) return;
         // Don't apply damage if already dead or invulnerable
         if (isDead) return;
 
