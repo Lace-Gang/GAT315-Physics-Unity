@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 /// <summary>
 /// Manages the health state of a game object, handling damage, healing, and death.
@@ -9,6 +10,8 @@ public class Health : MonoBehaviour
     [SerializeField] private float maxHealth = 100;           // Maximum possible health
     [SerializeField] private bool destroyOnDeath = true;      // Whether to destroy the game object on death
     [SerializeField] private float destroyDelay = 0;          // Delay before destroying the game object (useful for death animations)
+    [SerializeField] private UnityEvent onDamage;
+    [SerializeField] private UnityEvent onDeath;
 
     private bool isDead = false;                              // Flag to track death state
     public bool isInvincible = false;                         //Allown Invincibility Frames
@@ -39,6 +42,8 @@ public class Health : MonoBehaviour
         if (isInvincible) return;
         // Don't apply damage if already dead or invulnerable
         if (isDead) return;
+
+        onDamage?.Invoke();
 
         // Reduce health by damage amount
         health -= damage;
@@ -74,6 +79,8 @@ public class Health : MonoBehaviour
         // Set death state
         isDead = true;
         health = 0;
+
+        onDeath?.Invoke();
 
         // Destroy the game object if configured to do so
         if (destroyOnDeath)

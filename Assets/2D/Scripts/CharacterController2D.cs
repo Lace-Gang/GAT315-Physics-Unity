@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -21,6 +22,8 @@ public class CharacterController2D : MonoBehaviour
 	[SerializeField] float coyoteTime = 0.2f;       // Time in seconds character can jump after leaving ground
 	[SerializeField] float doubleJumpTime = 0.5f;   // Time window in seconds to perform a double jump
 
+	//[SerializeField] float climbingSpeed = 1.0f;
+
 	[Header("Ground Detection")]
 	[SerializeField] float castDistance = 0.1f;     // How far to check for ground below the character
 	[SerializeField] ContactFilter2D groundFilter;  // Layer and collision settings for ground detection
@@ -28,17 +31,36 @@ public class CharacterController2D : MonoBehaviour
 	[Header("Components")]
 	[SerializeField] Animator animator;             // Reference to character's animator
 	[SerializeField] SpriteRenderer spriteRenderer; // Reference to character's sprite renderer
-	[SerializeField] Health health;					// Reference to character's health
+	[SerializeField] GameObject sprite;
+	[SerializeField] Health health;                 // Reference to character's health
+	[SerializeField] FloatDataSO healthData;
+
+	//[SerializeField] BoolDataSO isClimbing;
+	[SerializeField] BoolDataSO isClimbing;
+	[SerializeField] FloatDataSO climbingSpeed;
+	[SerializeField] EventChannelSO winGameEvent;
+
+	[SerializeField] AudioSource attackSound;
+	[SerializeField] AudioSource damagedSound;
+	
+
+	bool hasWon = false;
 
 	Rigidbody2D rb;                                // Reference to attached Rigidbody2D component
 
+	public const int FACE_LEFT = -1;
+	public const int FACE_RIGHT = 1;
+
 	int facing = 1;                                // Facing direction: 1 = right, -1 = left
 	float currentSpeed = 0f;                       // Current horizontal speed after smoothing
+	public int Facing => facing;
+	public Rigidbody2D RB => rb; //Why isn't this working???
 
 	// Ground collision tracking
 	RaycastHit2D[] raycastHits = new RaycastHit2D[5]; // Buffer for ground collision results
 	int groundHits = 0;                              // Number of ground collisions detected
 	bool isGrounded = false;                         // Whether character is currently on ground
+	//public bool isClimbing = false;
 	float coyoteTimer = 0f;                          // Timer for coyote time jump window
 	float doubleJumpTimer = 0f;                      // Timer for double jump window
 
@@ -54,6 +76,11 @@ public class CharacterController2D : MonoBehaviour
 	float invincibilityFrames = 1;
 	bool isHit = false;
 	bool isDead = false;
+	private float deathTimer = 0.0f;
+
+
+
+
 	/// <summary>
 	/// Sets the movement direction based on input.
 	/// Called by input system when movement input changes.
@@ -62,7 +89,7 @@ public class CharacterController2D : MonoBehaviour
 	//public void OnMove(Vector2 v) => direction = v;
 	public void OnMove(Vector2 v)
 	{
-        if(isDead) return;
+        if(isDead || hasWon) return;
         direction = v;
 	}
 
@@ -73,6 +100,8 @@ public class CharacterController2D : MonoBehaviour
 	{
 		rb = GetComponent<Rigidbody2D>();
 		currentHealth = health.getHealth();
+		if(healthData != null) healthData.Value = health.getHealth();
+		winGameEvent?.AddListener(winGame);
 	}
 
 	/// <summary>
@@ -80,12 +109,27 @@ public class CharacterController2D : MonoBehaviour
 	/// </summary>
 	public void Update()
 	{
-        if(isDead) return;
+		if (isDead)
+		{
+			deathTimer += Time.deltaTime;
+			if(deathTimer >= 1.0)
+			{
+				//print("????????????????????????????????????");
+				//GameObject.SetGameObjectsActive(sprite.GetInstanceID(), false);
+				GameObject.Destroy(sprite);
+			}
+			return;
+		}
         UpdateGroundCollision();
 		UpdateFacing();
 		UpdateAnimator();
 		UpdateHealth();
 
+
+		//if(isClimbing.Value)
+		//{
+		//	throw new NotImplementedException();
+		//}
 	}
 
 	/// <summary>
@@ -96,6 +140,8 @@ public class CharacterController2D : MonoBehaviour
 		if(isDead) return;
 		// Calculate target speed based on input direction
 		float targetSpeed = direction.x * speed;
+
+		//Ladder climbing
 
 		// Apply acceleration based on grounded state
 		// Reduces control in the air by using the airControl multiplier
@@ -120,14 +166,25 @@ public class CharacterController2D : MonoBehaviour
 		if (rb.linearVelocityY < 0)
 		{
 			// We're falling - apply increased gravity for snappier falls
-			rb.linearVelocityY += Physics2D.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime;
+			rb.linearVelocityY += Physics2D.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime * rb.gravityScale;
+			//rb.linearVelocityY += Physics2D.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime;
 		}
 		else if (rb.linearVelocityY > 0 && jumpButtonReleased)
 		{
 			// We're rising but the jump button was released early
 			// Apply extra gravity to cut the jump short (creates variable jump height)
-			rb.linearVelocityY += Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.fixedDeltaTime;
+			rb.linearVelocityY += Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.fixedDeltaTime * rb.gravityScale;
 		}
+
+		if(isClimbing != null && climbingSpeed != null && isClimbing.Value)
+		{
+			//print("Something should be happening");
+			//rb.linearVelocityY = new Vector2(rb.linearVelocityX, 1.0f);
+			rb.linearVelocityY = climbingSpeed.Value;
+			//rb.AddForceY(rb.linearVelocityY); 
+			//rb.linearVelocityY
+		}
+
 
 		if(isHit)
 		{
@@ -135,6 +192,9 @@ public class CharacterController2D : MonoBehaviour
             rb.AddForce(knockback, ForceMode2D.Impulse);
 			isHit = false;
         }
+
+
+
 	}
 
 	/// <summary>
@@ -202,6 +262,7 @@ public class CharacterController2D : MonoBehaviour
 			if(health.getHealth() > 0)
 			{
 				currentHealth = health.getHealth();
+				if(healthData != null) healthData.Value = health.getHealth();
 				OnHit();
 			}
 			else
@@ -224,14 +285,19 @@ public class CharacterController2D : MonoBehaviour
 	/// </summary>
 	public void OnJump()
 	{
-		if (coyoteTimer > 0)
+		if(isDead || hasWon) return;
+		//print(isClimbing.Value);
+		if(isClimbing != null && isClimbing.Value) return;
+		//if (coyoteTimer > 0)
+		if ((coyoteTimer > 0 && isClimbing == null) || (coyoteTimer > 0 && !isClimbing))
 		{
 			// First jump - using coyote time for better feel
 			jumpButtonReleased = false;
 			doubleJumpTimer = doubleJumpTime;  // Enable double jump
 			ExecuteJump();
 		}
-		else if (doubleJumpTimer > 0)
+		//else if (doubleJumpTimer > 0 )
+		else if ((doubleJumpTimer > 0 && isClimbing == null) || (doubleJumpTimer > 0 && !isClimbing.Value))
 		{
 			// Double jump - only possible during double jump time window
 			jumpButtonReleased = false;
@@ -254,9 +320,12 @@ public class CharacterController2D : MonoBehaviour
 	/// </summary>
 	private void ExecuteJump()
 	{
+		if(isDead) return;
+		if (isClimbing != null && isClimbing.Value) return;
 		// Calculate jump velocity using physics formula:
 		// v = sqrt(2 * g * h) where g is gravity and h is desired height
-		float jumpVelocity = Mathf.Sqrt(-2 * Physics.gravity.y * jumpHeight * rb.gravityScale);
+		//float jumpVelocity = Mathf.Sqrt(-2 * Physics.gravity.y * jumpHeight * rb.gravityScale);
+		float jumpVelocity = Mathf.Sqrt(-2 * Physics.gravity.y * jumpHeight) * rb.gravityScale;
 		rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpVelocity);
 
 		// Trigger jump animation if animator exists
@@ -268,7 +337,9 @@ public class CharacterController2D : MonoBehaviour
 	/// </summary>
 	public void OnAttack()
 	{
+		if (isDead || hasWon) return;
 		animator?.SetTrigger("Attack");
+		if(!isDead && !hasWon && !isClimbing && isGrounded) attackSound?.Play();
 	}
 
 	/// <summary>
@@ -277,7 +348,10 @@ public class CharacterController2D : MonoBehaviour
 	public void OnDeath()
 	{
 		animator?.SetTrigger("Death");
+		animator?.SetBool("IsDead", true);
 		isDead = true;
+		rb.linearVelocityX = 0;
+		//GameObject.Destroy(this, 0.83);
 	}
 
 	/// <summary>
@@ -285,8 +359,10 @@ public class CharacterController2D : MonoBehaviour
 	/// </summary>
 	public void OnHit()
 	{
+		if (isDead || hasWon) return;
 		health.isInvincible = true;
 		animator?.SetTrigger("Hit");
+		damagedSound?.Play();
 		invincibilityFrames = 1;
 		isHit = true;
 		
@@ -294,6 +370,7 @@ public class CharacterController2D : MonoBehaviour
 
 	public void OnSprintOn()
 	{
+		if(hasWon) return;
         speedMultiplier = 2;
         animator?.SetBool("Sprinting", true);
     }
@@ -309,9 +386,15 @@ public class CharacterController2D : MonoBehaviour
     /// </summary>
     private void FlipDirection()
 	{
-		facing *= -1;  // Toggle between 1 and -1
+		if (isDead) return;
+        facing *= -1;  // Toggle between 1 and -1
 		if (spriteRenderer != null)
 			spriteRenderer.flipX = (facing == -1);  // Flip sprite when facing left
+	}
+
+	private void winGame()
+	{
+		hasWon = true;
 	}
 
 

@@ -20,6 +20,7 @@ public class Damage2D : MonoBehaviour
     /// </summary>
     private void OnCollisionEnter2D(Collision2D collision)
     {
+        print("hit");
         ApplyDamage(collision.gameObject);
     }
 

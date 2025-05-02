@@ -12,17 +12,17 @@ public class TriggerInfo2D : MonoBehaviour
         color = material.color;
     }
 
-    private void OnTriggerEnter(Collider2D other)
+    private void OnTriggerEnter2D(Collider2D Collider)
     {
-        if (other.tag == "Player")
+        if (Collider.tag == "Player")
         {
             material.color = Color.red;
         }
     }
 
-    private void OnTriggerExit(Collider2D other)
+    private void OnTriggerExit2D(Collider2D Collider)
     {
-        if (other.tag == "Player")
+        if (Collider.tag == "Player")
         {
             material.color = color;
         }

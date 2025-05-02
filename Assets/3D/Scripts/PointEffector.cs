@@ -9,7 +9,7 @@ public class PointEffector : MonoBehaviour
 
     [SerializeField] float radius = 1.0f;
     [SerializeField] LayerMask layerMask = Physics.AllLayers;
-    [SerializeField] bool constantForce = true;
+    [SerializeField] new bool constantForce = true;
 
     Vector3 centerPoint;
 
@@ -55,7 +55,7 @@ public class PointEffector : MonoBehaviour
        Vector3 itemPosition = collider.gameObject.transform.position;
        Vector3 direction = itemPosition - centerPoint;
     
-       if(constantForce)
+       if(GetComponent<ConstantForce>())
        {
            rb.AddForce(direction * collider.GetComponent<Pushable>().pushValue, ForceMode.Impulse);
        }

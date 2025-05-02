@@ -20,17 +20,17 @@ public class CollisionInfo2D
 
     }
 
-    private void OnCollisionStay(Collision2D collision)
+    private void OnCollisionStay2D(Collision2D Collision)
     {
-        if (collision.gameObject.tag == "Player")
+        if (Collision.gameObject.tag == "Player")
         {
             material.color = Color.red;
         }
     }
 
-    private void OnCollisionExit(Collision2D collision)
+    private void OnCollisionExit2D(Collision2D Collision)
     {
-        if (collision.gameObject.tag == "Player")
+        if (Collision.gameObject.tag == "Player")
         {
             material.color = color;
         }
